@@ -1,0 +1,4 @@
+lightning[pytorch-extra]==2.4.*
+pandas>=2.2.*
+numpy<2.0
+mido==1.3.*
