@@ -1,4 +1,4 @@
 -r requirements.txt
 pytest==8.3.*
 mypy==1.11.*
-pandas_stubs=2.2.*
+pandas_stubs==2.2.*
