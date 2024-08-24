@@ -3,6 +3,7 @@ from typing import NamedTuple, Optional
 import mido
 import numpy as np
 import pandas as pd
+import torch
 
 
 class QuantizedValue(NamedTuple):
@@ -22,10 +23,7 @@ class PianoRoll:
                 return mido.tempo2bpm(msg.tempo)
         return None
 
-    def events(self, hold_notes_with_pedal: bool = False) -> pd.DataFrame:
-        if hold_notes_with_pedal:
-            raise NotImplemented
-
+    def events(self) -> pd.DataFrame:
         events = []
         time = 0.0
         for msg in self.midi_file:
@@ -53,20 +51,18 @@ class PianoRoll:
 
     def performance_vector_one_hot(
         self,
-        num_time_slots: int = 125,
-        num_velocities: int = 32,
-        include_pedal: bool = True,
+        performance_vector_factory: "PerformanceVectorFactory",
     ) -> np.ndarray:
         events_df = self.events()
         vectors = []
         events_df["time_delta"] = events_df["time"].diff(1).fillna(0.0)
 
-        performance_vector_factory = PerformanceVectorFactory(
-            num_notes=88,
-            num_velocities=num_velocities,
-            num_time=num_time_slots,
-            include_pedal=include_pedal,
-        )
+        # performance_vector_factory = PerformanceVectorFactory(
+        #     num_notes=88,
+        #     num_velocities=num_velocities,
+        #     num_time=num_time_slots,
+        #     include_pedal=include_pedal,
+        # )
 
         for _, event in events_df.iterrows():
             if event["time_delta"] >= 0.01:
@@ -105,6 +101,12 @@ def quantize(
 class PerformanceVectorFactory:
     """Convenience method which allows us to create and read a performance vector
     in a programmatic manner by encapsulating its state in a class.
+
+    .. todo::
+
+        Anything that is beyond the range of our keyboard will be transposed down or
+        up by one octave.
+
     """
 
     def __init__(
@@ -135,6 +137,18 @@ class PerformanceVectorFactory:
             )
         )
 
+    @property
+    def _velocity_vector_offset(self) -> int:
+        return self.num_note_on + self.num_note_off + self.num_time
+
+    def velocity_vector_view(self, x: torch.Tensor) -> torch.Tensor:
+        # [sequence, features]
+        return x[
+            :,
+            self._velocity_vector_offset : self._velocity_vector_offset
+            + self.num_velocities,
+        ]
+
     def velocity_vector(self, velocity: int) -> np.ndarray:
         velocity = np.clip(velocity, 0, 127)
         quantized_velocity_num = int(
@@ -149,13 +163,16 @@ class PerformanceVectorFactory:
             )
         )
         vector = self._blank_vector()
-        vector[
-            self.num_note_on
-            + self.num_note_off
-            + self.num_time
-            + quantized_velocity_num
-        ] = 1.0
+        vector[self._velocity_vector_offset + quantized_velocity_num] = 1.0
         return vector
+
+    @property
+    def _time_vector_offset(self) -> int:
+        return self.num_note_on + self.num_note_off
+
+    def time_vector_view(self, x: torch.Tensor) -> torch.Tensor:
+        # [sequence, features]
+        return x[:, self._time_vector_offset : self._time_vector_offset + self.num_time]
 
     def time_vector(self, time: float) -> np.ndarray:
         # time in s
@@ -172,19 +189,51 @@ class PerformanceVectorFactory:
             )
         )
         vector = self._blank_vector()
-        vector[self.num_note_on + self.num_note_off + quantized_time_num] = 1.0
+        vector[self._time_vector_offset + quantized_time_num] = 1.0
         return vector
+
+    @property
+    def _note_on_vector_offset(self) -> int:
+        return 0
+
+    def note_on_vector_view(
+        self, x: torch.Tensor, with_pedal: bool = True
+    ) -> torch.Tensor:
+        offset_end = self._note_on_vector_offset + self.num_note_on
+        if with_pedal and not self.include_pedal:
+            raise Exception("Can't extract pedal on non-pedal factory")
+        elif with_pedal is False and self.include_pedal:
+            offset_end -= 1
+
+        return x[:, self._note_on_vector_offset : offset_end]
 
     def note_on_vector(self, note_on: int) -> np.ndarray:
         if note_on == -1:
             if not self.include_pedal:
                 raise Exception("Encountered pedal on value in non-pedal factory")
+            # put pedal at the end
             note_on = self.num_note_on
         else:
+            # we'll clip the value just to be sure
             note_on = np.clip(note_on - self.midi_note_offset, 0, self.num_note_on)
         vector = self._blank_vector()
-        vector[int(note_on)] = 1.0
+        vector[self._note_on_vector_offset + int(note_on)] = 1.0
         return vector
+
+    @property
+    def _note_off_vector_offset(self) -> int:
+        return self.num_note_on
+
+    def note_off_vector_view(
+        self, x: torch.Tensor, with_pedal: bool = True
+    ) -> torch.Tensor:
+        offset_end = self._note_off_vector_offset + self.num_note_off
+        if with_pedal and not self.include_pedal:
+            raise Exception("Can't extract pedal on non-pedal factory")
+        elif with_pedal is False and self.include_pedal:
+            offset_end -= 1
+
+        return x[:, self._note_off_vector_offset : offset_end]
 
     def note_off_vector(self, note_off: int) -> np.ndarray:
         if note_off == -1:
@@ -194,7 +243,7 @@ class PerformanceVectorFactory:
         else:
             note_off = np.clip(note_off - self.midi_note_offset, 0, self.num_note_off)
         vector = self._blank_vector()
-        vector[self.num_note_on + int(note_off)] = 1.0
+        vector[self._note_off_vector_offset + int(note_off)] = 1.0
         return vector
 
     def reverse_vector(self, vector: np.ndarray):

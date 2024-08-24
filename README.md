@@ -22,7 +22,7 @@ Use `python cli.py --help` to display the help.
 
 ```shell
 python cli.py fit \
-    --data.data_dir /path/to/my/data
+    --data.data_dir data/
 ```
 
 Observe the training process via tensorboard on <http://127.0.0.1:6006> via
@@ -44,6 +44,7 @@ python cli.py \
 ## Changes
 
 * The original paper uses all available 128 MIDI pitch values as input data. As we focus on piano, we reduced this to 88 in order to make our model less complex.
+* The original paper suggest transposing the material in -5, +6 semitones for data augmentation. As we operate sequentially through MIDI files and therefore can't jump efficiently through (transposed) files, we transpose on the fly. But instead of using an uniform distribution for transposing, we are using a normal-distributed transposing around 0 to pronounce the original tuning.
 
 ## Resources
 

@@ -10,6 +10,17 @@ jobs:
         runs-on: ubuntu-latest
         name: pre-commit
         steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-python@v4
-        - uses: pre-commit/action@v3.0.0
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v4
+            - uses: pre-commit/action@v3.0.0
+
+    pytest:
+        runs-on: ubuntu-latest
+        name: pytest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v4
+              with:
+                python-version: '3.10'
+            - run: pip install -r requirements-dev.txt
+            - run: pytest .
