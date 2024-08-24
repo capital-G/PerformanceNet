@@ -46,6 +46,20 @@ python cli.py \
 * The original paper uses all available 128 MIDI pitch values as input data. As we focus on piano, we reduced this to 88 in order to make our model less complex.
 * The original paper suggest transposing the material in -5, +6 semitones for data augmentation. As we operate sequentially through MIDI files and therefore can't jump efficiently through (transposed) files, we transpose on the fly. But instead of using an uniform distribution for transposing, we are using a normal-distributed transposing around 0 to pronounce the original tuning.
 
+## Development
+
+Run unit tests via
+
+```shell
+pytest .
+```
+
+Run static mypy tests via
+
+```shell
+mypy performance_net
+```
+
 ## Resources
 
 * [Performance RNN Website](https://magenta.tensorflow.org/performance-rnn)

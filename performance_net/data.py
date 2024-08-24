@@ -114,10 +114,10 @@ class PerformanceOneHotDataset(torch.utils.data.IterableDataset):
                 y = performance_vector[
                     i + self.window_size : i + self.window_size + self.window_size_out
                 ]
-                x = torch.Tensor(x)
-                y = torch.Tensor(y)
+                tensor_x = torch.Tensor(x)
+                tensor_y = torch.Tensor(y)
 
                 for transformation in self.transformations:
-                    x, y = transformation(x, y)
+                    tensor_x, tensor_y = transformation(tensor_x, tensor_y)
 
-                yield x, y
+                yield tensor_x, tensor_y

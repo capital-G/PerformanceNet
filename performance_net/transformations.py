@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import NamedTuple, Optional
 
 import mido
@@ -12,7 +13,7 @@ class QuantizedValue(NamedTuple):
 
 
 class PianoRoll:
-    def __init__(self, midi_file_path: str):
+    def __init__(self, midi_file_path: Path):
         self._midi_file_path = midi_file_path
         self.midi_file = mido.MidiFile(self._midi_file_path)
         self.tempo = self.get_tempo()
@@ -20,7 +21,7 @@ class PianoRoll:
     def get_tempo(self) -> Optional[float]:
         for msg in self.midi_file:
             if msg.type == "set_tempo":
-                return mido.tempo2bpm(msg.tempo)
+                return mido.tempo2bpm(msg.tempo)  # type: ignore
         return None
 
     def events(self) -> pd.DataFrame:
@@ -112,7 +113,7 @@ class PerformanceVectorFactory:
     def __init__(
         self,
         num_notes: int = 88,
-        num_time=125,
+        num_time: int = 125,
         num_velocities: int = 32,
         include_pedal: bool = True,
         midi_note_offset: int = 21,

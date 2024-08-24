@@ -1,20 +1,10 @@
 import abc
-from datetime import datetime, timedelta
-from typing import Optional, Tuple, TypedDict
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
 
 from performance_net.transformations import PerformanceVectorFactory
-
-
-class MidiEvent(TypedDict):
-    time: datetime
-    time_delta: timedelta
-    # between 0 and 127
-    velocity: int
-    # between -1 and 127 where -1 is the pedal
-    note: int
 
 
 class Augmentation(abc.ABC):
